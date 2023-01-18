@@ -7,6 +7,13 @@ that contains a list of commands and their descriptions. It even works
 with nested commands. Check out the example [Runtfile](./Runtfile)
 in this repo!
 
+## Install on Mac
+
+```sh
+brew tap jharrilim/runt
+brew install runt
+```
+
 ## Usage
 
 To use runt, pass the name of a command to the runt command.
