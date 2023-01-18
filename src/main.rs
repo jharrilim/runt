@@ -56,7 +56,7 @@ impl Runtfile {
     }
 
     fn root_command(&self) -> &Command {
-        &self.commands.iter().next().unwrap().1
+        self.commands.iter().next().unwrap().1
     }
 }
 
@@ -99,7 +99,7 @@ fn parse(input: &str) -> Runtfile {
             if cmd.name.is_empty() {
                 cmd.name = String::from_utf8(text.clone())
                     .unwrap()
-                    .replace(" ", "-")
+                    .replace(' ', "-")
                     .to_lowercase();
             } else {
                 cmd.description = String::from_utf8(text.clone()).unwrap();
@@ -116,7 +116,7 @@ fn parse(input: &str) -> Runtfile {
                     subcommands: vec![],
                 });
                 let parent = runtfile.command_mut(parent_index);
-                parent.subcommands.push(index.clone());
+                parent.subcommands.push(index);
                 cmd_idx = index;
             }
         }
@@ -206,7 +206,7 @@ fn main() -> io::Result<()> {
         let runtfile = parse(&runtfile);
         let cli = build_cli_from_runtfile(cli, &runtfile);
         let matches = cli.get_matches();
-        let (cmd, args) = match_command(&runtfile, &matches, &runtfile.root_command());
+        let (cmd, args) = match_command(&runtfile, &matches, runtfile.root_command());
         let cmd = cmd.unwrap();
         match cmd.script {
             Script::Javascript => eval::javascript(&cmd.code, args),
