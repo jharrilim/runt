@@ -15,6 +15,13 @@ To use runt, pass the name of a command to the runt command.
 runt [command]
 ```
 
+## Todo
+
+- Switch to typed recursive decent parsing to properly support different types of
+  in headers and paragraphs, such as text, links, and a combination thereof
+- Support other shells
+- Setup some syntax for declaring arguments, probably using lists
+
 ## Runtfile
 
 The Runtfile consists of three parts:
