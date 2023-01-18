@@ -1,8 +1,9 @@
-use std::fs::File;
-use std::io::{self, Write, Read};
-use std::process;
+mod eval;
 
-use clap::{ArgMatches, Command as ClapCommand};
+use std::fs::File;
+use std::io::{self, Read};
+
+use clap::{Arg, ArgMatches, Command as ClapCommand};
 use comrak::nodes::{AstNode, NodeValue};
 use comrak::{parse_document, Arena as TypedArena, ComrakOptions};
 use la_arena::{Arena, Idx};
@@ -123,9 +124,9 @@ fn parse(input: &str) -> Runtfile {
             let cmd = runtfile.command_mut(cmd_idx);
             cmd.code = String::from_utf8(code.literal.clone()).unwrap();
             cmd.script = match String::from_utf8(code.info.clone()).unwrap().as_str() {
-                "bash" => Script::Bash,
+                "bash" => Script::Bash, // TODO: support other shells
                 "python" => Script::Python,
-                "javascript" => Script::Javascript,
+                "javascript" | "js" => Script::Javascript,
                 "ruby" => Script::Ruby,
                 _ => Script::Bash,
             };
@@ -135,16 +136,24 @@ fn parse(input: &str) -> Runtfile {
     runtfile
 }
 
-fn build_cli_from_runtfile(runtfile: &Runtfile) -> ClapCommand {
-    let mut cli = ClapCommand::new("runt");
-    cli = cli.subcommand(build_command(runtfile, runtfile.root_command()));
+fn build_cli_from_runtfile(cli: ClapCommand, runtfile: &Runtfile) -> ClapCommand {
+    let mut cli = cli;
+    let root_cmd = runtfile.root_command();
+    cli = cli.name(root_cmd.name.clone());
+
+    for c in root_cmd.subcommands.iter() {
+        cli = cli.subcommand(build_command(runtfile, runtfile.command(*c)));
+    }
     cli
 }
 
 fn build_command(runtfile: &Runtfile, cmd: &Command) -> ClapCommand {
-    let mut subcommand = ClapCommand::new(cmd.name.clone());
+    let mut subcommand = ClapCommand::new(cmd.name.clone()).about(cmd.description.clone());
+    if !cmd.code.is_empty() {
+        subcommand = subcommand
+            .arg(Arg::new("--").help("Arguments coming after this are passed to the script."));
+    }
 
-    subcommand = subcommand.about(cmd.description.clone());
     for subcommand_index in cmd.subcommands.iter() {
         subcommand =
             subcommand.subcommand(build_command(runtfile, runtfile.command(*subcommand_index)));
@@ -152,69 +161,34 @@ fn build_command(runtfile: &Runtfile, cmd: &Command) -> ClapCommand {
     subcommand
 }
 
-fn match_command(runtfile: &Runtfile, matches: &ArgMatches, cmd: &Command) -> Option<Command> {
-    if let Some(subcommand) = matches.subcommand_matches(cmd.name.as_str()) {
-        // check if it has any subcommands, and if it does, return the first one that matches
-        for subcommand_index in cmd.subcommands.iter() {
-            let m = match_command(runtfile, subcommand, runtfile.command(*subcommand_index));
-            if m.is_some() {
-                return m;
-            }
-        }
-        return Some(cmd.clone());
+fn match_command(
+    runtfile: &Runtfile,
+    matches: &ArgMatches,
+    cmd: &Command,
+) -> (Option<Command>, Option<String>) {
+    let (cmd, sub_matches) = if cmd.name == "runt" {
+        (cmd, matches)
+    } else if let Some(sub_matches) = matches.subcommand_matches(cmd.name.as_str()) {
+        (cmd, sub_matches)
     } else {
-        return None;
+        return (None, None);
+    };
+
+    // check if it has any subcommands, and if it does, return the first one that matches
+    for subcommand_index in cmd.subcommands.iter() {
+        let m = match_command(runtfile, sub_matches, runtfile.command(*subcommand_index));
+        if m.0.is_some() {
+            return m;
+        }
     }
-}
-
-fn run_javascript(code: &str) -> io::Result<()> {
-    let mut child = process::Command::new("node")
-        .arg("-")
-        .stdin(process::Stdio::piped())
-        .stdout(process::Stdio::piped())
-        .spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(code.as_bytes())?;
-    }
-
-    let output = child.wait_with_output()?;
-    println!("{}", String::from_utf8(output.stdout).unwrap());
-    Ok(())
-}
-
-fn run_python(code: &str) -> io::Result<()> {
-    let mut child = process::Command::new("python")
-        .arg("-")
-        .stdin(process::Stdio::piped())
-        .stdout(process::Stdio::piped())
-        .spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(code.as_bytes())?;
-    }
-    let output = child.wait_with_output()?;
-    println!("{}", String::from_utf8(output.stdout).unwrap());
-    Ok(())
-}
-
-fn run_bash(code: &str) -> io::Result<()> {
-    let mut child = process::Command::new("bash")
-        .arg("-")
-        .stdin(process::Stdio::piped())
-        .stdout(process::Stdio::piped())
-        .spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(code.as_bytes())?;
-    }
-    let output = child.wait_with_output()?;
-    println!("{}", String::from_utf8(output.stdout).unwrap());
-    Ok(())
-}
-
-fn run_ruby(_code: &str) -> io::Result<()> {
-    todo!("run ruby code");
+    return (
+        Some(cmd.clone()),
+        sub_matches
+            .try_get_one::<String>("--")
+            .ok()
+            .flatten()
+            .cloned(),
+    );
 }
 
 fn read_runtfile() -> io::Result<String> {
@@ -225,17 +199,26 @@ fn read_runtfile() -> io::Result<String> {
 }
 
 fn main() -> io::Result<()> {
-    let runtfile = parse(&read_runtfile()?);
-    let cli = build_cli_from_runtfile(&runtfile);
+    let about = "Run commands defined in a Runtfile.";
+    let cli = ClapCommand::new("runt").about(about);
 
-    let matches = cli.get_matches();
-
-    let cmd = match_command(&runtfile, &matches, &runtfile.root_command()).unwrap();
-
-    match cmd.script {
-        Script::Javascript => run_javascript(&cmd.code),
-        Script::Python => run_python(&cmd.code),
-        Script::Bash => run_bash(&cmd.code),
-        Script::Ruby => run_ruby(&cmd.code),
+    if let Ok(runtfile) = read_runtfile() {
+        let runtfile = parse(&runtfile);
+        let cli = build_cli_from_runtfile(cli, &runtfile);
+        let matches = cli.get_matches();
+        let (cmd, args) = match_command(&runtfile, &matches, &runtfile.root_command());
+        let cmd = cmd.unwrap();
+        match cmd.script {
+            Script::Javascript => eval::javascript(&cmd.code, args),
+            Script::Python => eval::python(&cmd.code, args),
+            Script::Bash => eval::bash(&cmd.code, args),
+            Script::Ruby => eval::ruby(&cmd.code, args),
+        }
+    } else {
+        let warning = format!(
+            "{}\n👷 A Runtfile wasn't detected in the current directory. No commands loaded.",
+            about
+        );
+        cli.about(warning).print_help()
     }
 }
