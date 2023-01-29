@@ -1,0 +1,40 @@
+.features {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  width: 100%;
+}
+
+.featureSvg {
+  height: 200px;
+  width: 200px;
+}
+
+.feature {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.featureRow {
+  gap: 80px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.featureImage {
+  width: 100%;
+  max-width: 700px;
+  min-width: 530px;
+}
+
+@media (max-width: 540px) {
+  .featureImage {
+    max-width: 100%;
+    min-width: 100%;
+  }
+}

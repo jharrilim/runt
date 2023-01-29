@@ -1,0 +1,90 @@
+---
+sidebar_position: 1
+---
+
+# Quickstart
+
+Let's discover **Runt in less than 5 minutes**!
+
+## Getting Started
+
+Firstly, let's download `runt`. This can be done by using the following:
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs groupId="operating-systems">
+<TabItem value="mac" label="macOS" default>
+
+Using [homebrew](https://brew.sh/):
+
+```shell
+brew tap jharrilim/runt
+brew install jharrilim/runt
+```
+
+</TabItem>
+<TabItem value="win" label="Windows" className="yes">
+
+:::info
+
+Chocolatey support not yet added
+
+:::
+<!-- 
+Using [chocolatey](https://chocolatey.org/):
+
+```shell
+choco install runt
+``` -->
+
+</TabItem>
+</Tabs>
+
+## Writing your first Runtfile
+
+With runt installed, let's go ahead and create a Runtfile.
+You may create this in any directory you like, although ideally
+at the root of a project.
+
+
+````md title="Runtfile" showLineNumbers
+# MyProject
+
+## Hello World
+
+This is a hello world
+
+```bash
+echo "Hello, world!"
+```
+````
+
+## Running a task
+
+With your Runtfile now created, you may now run a task.
+
+Let's do it!
+
+```bash
+$ runt hello-world
+
+Hello, world!
+```
+
+Notice how the "Hello World" header was converted into
+the name of the command for runt to execute. To see the
+help text associated with it, run `runt --help`:
+
+```bash
+$ runt --help
+
+Usage: runt [COMMAND]
+
+Commands:
+  hello-world  This is a hello world
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help   Print help
+```
