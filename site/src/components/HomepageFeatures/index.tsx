@@ -35,7 +35,7 @@ function Feature({ title, image, description }: FeatureItem) {
   return (
     <div className={styles.feature}>
       <div>
-        <img height={400} className={styles.featureImage} src={image} />
+        <img className={styles.featureImage} src={image} />
       </div>
       <div className="text--center padding-horiz--md">
         <h3>{title}</h3>

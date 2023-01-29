@@ -27,6 +27,7 @@
 }
 
 .featureImage {
+  height: 400px;
   width: 100%;
   max-width: 700px;
   min-width: 530px;
@@ -34,6 +35,7 @@
 
 @media (max-width: 540px) {
   .featureImage {
+    height: unset;
     max-width: 100%;
     min-width: 100%;
   }
