@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://josephharrisonlim.com/runt/blog</id>
+    <title>Runt Blog</title>
+    <updated>2023-01-28T00:00:00.000Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://josephharrisonlim.com/runt/blog"/>
+    <subtitle>Runt Blog</subtitle>
+    <icon>https://josephharrisonlim.com/runt/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Welcome]]></title>
+        <id>https://josephharrisonlim.com/runt/blog/welcome</id>
+        <link href="https://josephharrisonlim.com/runt/blog/welcome"/>
+        <updated>2023-01-28T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Welcome to the Runt blog! Truthfully, I don't know if this will get used much.]]></summary>
+        <content type="html"><![CDATA[<p>Welcome to the Runt blog! Truthfully, I don't know if this will get used much.
+This might just end up being a spot for release notes. We shall see!</p>]]></content>
+        <author>
+            <name>Joseph Harrison-Lim</name>
+            <uri>https://github.com/jharrilim</uri>
+        </author>
+        <category label="runt" term="runt"/>
+        <category label="first-post" term="first-post"/>
+    </entry>
+</feed>

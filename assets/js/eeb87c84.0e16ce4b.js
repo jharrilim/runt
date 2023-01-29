@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[663],{7543:t=>{t.exports=JSON.parse('[{"label":"runt","permalink":"/runt/blog/tags/runt","count":1},{"label":"first-post","permalink":"/runt/blog/tags/first-post","count":1}]')}}]);
