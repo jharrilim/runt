@@ -36,10 +36,11 @@ echo "Hello $1"
 ## Release
 
 This command is used to build binaries and generate a release for Homebrew.
+Currently supports intel and silicon.
 
 ```bash
 name="runt"
-version="$1"
+version="$(cargo read-manifest | jq '.version')"
 
 mac_intel="x86_64-apple-darwin"
 mac_silicon="aarch64-apple-darwin"

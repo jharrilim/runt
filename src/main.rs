@@ -9,7 +9,8 @@ use std::io::{self, Read};
 use clap::Command as ClapCommand;
 
 fn read_runtfile() -> io::Result<String> {
-    let mut file = File::open("Runtfile")?;
+    let mut file = File::open("Runtfile")
+        .or_else(|_| File::open("Runtfile.md"))?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
     Ok(contents)
