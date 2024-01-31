@@ -40,7 +40,7 @@ Currently supports intel and silicon.
 
 ```bash
 name="runt"
-version="$(cargo read-manifest | jq '.version')"
+version="$(cargo read-manifest | jq '.version' -r)"
 
 mac_intel="x86_64-apple-darwin"
 mac_silicon="aarch64-apple-darwin"
