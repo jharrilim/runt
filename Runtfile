@@ -1,8 +1,14 @@
 # runt
 
+Dogfooding runt
+
 ## Test
 
+Some test commands using various languages
+
 ### javascript
+
+This is a javascript test!
 
 ```javascript
 process.argv.shift(); // node

@@ -1,195 +1,12 @@
-mod eval;
+use runt::compile::{build_cli_from_runtfile, match_command};
+use runt::eval;
+use runt::parser::parse;
+use runt::runtfile::{Script, ABOUT};
 
 use std::fs::File;
 use std::io::{self, Read};
 
-use clap::{Arg, ArgMatches, Command as ClapCommand};
-use comrak::nodes::{AstNode, NodeValue};
-use comrak::{parse_document, Arena as TypedArena, ComrakOptions};
-use la_arena::{Arena, Idx};
-
-fn iter_nodes<'a, F>(node: &'a AstNode<'a>, f: &mut F)
-where
-    F: FnMut(&'a AstNode<'a>),
-{
-    f(node);
-    for c in node.children() {
-        iter_nodes(c, f);
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct Command {
-    name: String,
-    description: String,
-    script: Script,
-    code: String,
-    level: u32,
-    subcommands: Vec<Idx<Command>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct Runtfile {
-    commands: Arena<Command>,
-}
-
-impl Runtfile {
-    fn add_command(&mut self, command: Command) -> Idx<Command> {
-        self.commands.alloc(command)
-    }
-
-    fn find_parent(&self, level: u32) -> Option<Idx<Command>> {
-        for (index, command) in self.commands.iter() {
-            if command.level == level - 1 {
-                return Some(index);
-            }
-        }
-        None
-    }
-
-    fn command(&self, index: Idx<Command>) -> &Command {
-        &self.commands[index]
-    }
-
-    fn command_mut(&mut self, index: Idx<Command>) -> &mut Command {
-        &mut self.commands[index]
-    }
-
-    fn root_command(&self) -> &Command {
-        self.commands.iter().next().unwrap().1
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum Script {
-    Bash,
-    Python,
-    Javascript,
-    Ruby,
-}
-
-/**
- *
- */
-fn parse(input: &str) -> Runtfile {
-    let mut runtfile = Runtfile {
-        commands: Arena::new(),
-    };
-
-    // The returned nodes are created in the supplied Arena, and are bound by its lifetime.
-    let arena = TypedArena::new();
-
-    let root = parse_document(&arena, input, &ComrakOptions::default());
-
-    let root_cmd = runtfile.add_command(Command {
-        name: String::from(""),
-        description: String::from(""),
-        script: Script::Bash,
-        code: String::from(""),
-        level: 1,
-        subcommands: vec![],
-    });
-
-    let mut cmd_idx: Idx<Command> = root_cmd;
-
-    iter_nodes(root, &mut |node| match &node.data.borrow().value {
-        NodeValue::Text(text) => {
-            let cmd = runtfile.command_mut(cmd_idx);
-
-            if cmd.name.is_empty() {
-                cmd.name = String::from_utf8(text.clone())
-                    .unwrap()
-                    .replace(' ', "-")
-                    .to_lowercase();
-            } else {
-                cmd.description = String::from_utf8(text.clone()).unwrap();
-            }
-        }
-        NodeValue::Heading(heading) => {
-            if let Some(parent_index) = runtfile.find_parent(heading.level) {
-                let index = runtfile.add_command(Command {
-                    name: String::from(""),
-                    description: String::from(""),
-                    script: Script::Bash,
-                    code: String::from(""),
-                    level: heading.level,
-                    subcommands: vec![],
-                });
-                let parent = runtfile.command_mut(parent_index);
-                parent.subcommands.push(index);
-                cmd_idx = index;
-            }
-        }
-        NodeValue::CodeBlock(code) => {
-            let cmd = runtfile.command_mut(cmd_idx);
-            cmd.code = String::from_utf8(code.literal.clone()).unwrap();
-            cmd.script = match String::from_utf8(code.info.clone()).unwrap().as_str() {
-                "bash" => Script::Bash, // TODO: support other shells
-                "python" => Script::Python,
-                "javascript" | "js" => Script::Javascript,
-                "ruby" => Script::Ruby,
-                _ => Script::Bash,
-            };
-        }
-        _ => (),
-    });
-    runtfile
-}
-
-fn build_cli_from_runtfile(cli: ClapCommand, runtfile: &Runtfile) -> ClapCommand {
-    let mut cli = cli;
-    let root_cmd = runtfile.root_command();
-    cli = cli.name(root_cmd.name.clone());
-
-    for c in root_cmd.subcommands.iter() {
-        cli = cli.subcommand(build_command(runtfile, runtfile.command(*c)));
-    }
-    cli
-}
-
-fn build_command(runtfile: &Runtfile, cmd: &Command) -> ClapCommand {
-    let mut subcommand = ClapCommand::new(cmd.name.clone()).about(cmd.description.clone());
-    if !cmd.code.is_empty() {
-        subcommand = subcommand
-            .arg(Arg::new("--").help("Arguments coming after this are passed to the script."));
-    }
-
-    for subcommand_index in cmd.subcommands.iter() {
-        subcommand =
-            subcommand.subcommand(build_command(runtfile, runtfile.command(*subcommand_index)));
-    }
-    subcommand
-}
-
-fn match_command(
-    runtfile: &Runtfile,
-    matches: &ArgMatches,
-    cmd: &Command,
-) -> (Option<Command>, Option<String>) {
-    let (cmd, sub_matches) = if cmd.name == "runt" {
-        (cmd, matches)
-    } else if let Some(sub_matches) = matches.subcommand_matches(cmd.name.as_str()) {
-        (cmd, sub_matches)
-    } else {
-        return (None, None);
-    };
-
-    // check if it has any subcommands, and if it does, return the first one that matches
-    for subcommand_index in cmd.subcommands.iter() {
-        let m = match_command(runtfile, sub_matches, runtfile.command(*subcommand_index));
-        if m.0.is_some() {
-            return m;
-        }
-    }
-    return (
-        Some(cmd.clone()),
-        sub_matches
-            .try_get_one::<String>("--")
-            .ok()
-            .flatten()
-            .cloned(),
-    );
-}
+use clap::Command as ClapCommand;
 
 fn read_runtfile() -> io::Result<String> {
     let mut file = File::open("Runtfile")?;
@@ -198,13 +15,10 @@ fn read_runtfile() -> io::Result<String> {
     Ok(contents)
 }
 
-fn main() -> io::Result<()> {
-    let about = "Run commands defined in a Runtfile.";
-    let cli = ClapCommand::new("runt").about(about);
-
-    if let Ok(runtfile) = read_runtfile() {
+pub(crate) fn run(runtfile_source: Option<String>) -> Result<(), io::Error> {
+    if let Some(runtfile) = runtfile_source {
         let runtfile = parse(&runtfile);
-        let cli = build_cli_from_runtfile(cli, &runtfile);
+        let cli = build_cli_from_runtfile(&runtfile);
         let matches = cli.get_matches();
         let (cmd, args) = match_command(&runtfile, &matches, runtfile.root_command());
         let cmd = cmd.unwrap();
@@ -215,10 +29,60 @@ fn main() -> io::Result<()> {
             Script::Ruby => eval::ruby(&cmd.code, args),
         }
     } else {
+        let cli = ClapCommand::new("runt").about(ABOUT);
         let warning = format!(
             "{}\n👷 A Runtfile wasn't detected in the current directory. No commands loaded.",
-            about
+            ABOUT
         );
         cli.about(warning).print_help()
+    }
+}
+
+fn main() -> io::Result<()> {
+    run(read_runtfile().ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parse;
+    use runt::{compile, runtfile::Script};
+
+    use dedent_macro::dedent;
+    #[test]
+    fn parses_markdown_command() {
+        let runtfile = parse(dedent!(
+            "
+            # Chocolate
+
+            ## Rain
+
+            Some stay high while others feel the pain
+
+            ```sh
+            echo chocolate rain
+            ```
+        "
+        ));
+
+        // Test that we parse it correctly
+        println!("{:?}", runtfile);
+        assert_eq!(runtfile.root_command().name, "chocolate".to_string());
+        let command = runtfile.find_command_by_name("rain");
+        assert!(command.is_some());
+        let command = command.unwrap();
+        assert_eq!(command.script, Script::Bash);
+
+        // Test that we generate the correct CLI
+        let cli = compile::build_cli_from_runtfile(&runtfile);
+        assert_eq!(cli.get_name(), "chocolate".to_string());
+
+        let subcommand = cli.find_subcommand("rain");
+        assert!(subcommand.is_some());
+        let subcommand = subcommand.unwrap();
+
+        let about = subcommand.get_about();
+        assert!(about.is_some());
+        let about = about.unwrap();
+        assert!(about.to_string().contains("feel the pain"));
     }
 }
